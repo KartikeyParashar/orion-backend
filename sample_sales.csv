@@ -1,0 +1,5 @@
+Category,Subcategory,Item,Store,Week,Season,Units Sold,Gross Selling Price,Net Sales Price,Markdown %,Ending Stock
+Apparel,Mens,T-Shirt,London,W01,Spring,100,20.00,18.00,10.00,500
+Apparel,Womens,Dress,Paris,W01,Spring,80,50.00,45.00,10.00,300
+Electronics,Gadgets,Watch,New York,W02,Summer,50,150.00,135.00,10.00,200
+Home,Furniture,Chair,Sydney,W02,Summer,30,80.00,72.00,10.00,150
