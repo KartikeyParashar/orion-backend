@@ -100,8 +100,8 @@ DATABASES = {
 CORS_ALLOW_ALL_ORIGINS = DEBUG # Only allow all in debug/dev
 
 if not DEBUG:
-    CORS_ALLOWED_ORIGINS = os.environ.get('CORS_ALLOWED_ORIGINS', '').split(' ')
-    CSRF_TRUSTED_ORIGINS = os.environ.get('CSRF_TRUSTED_ORIGINS', '').split(' ')
+    CORS_ALLOWED_ORIGINS = [o for o in os.environ.get('CORS_ALLOWED_ORIGINS', '').split(' ') if o]
+    CSRF_TRUSTED_ORIGINS = [o for o in os.environ.get('CSRF_TRUSTED_ORIGINS', '').split(' ') if o]
 
 REST_FRAMEWORK = {
     'DEFAULT_FILTER_BACKENDS': (
