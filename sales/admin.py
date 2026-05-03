@@ -1,9 +1,8 @@
 from django.contrib import admin
-from .models import Sale
-
-@admin.register(Sale)
-class SaleAdmin(admin.ModelAdmin):
-    list_display = ('item', 'category', 'store', 'week', 'units_sold', 'net_sales_price')
-    list_filter = ('category', 'store', 'season', 'week')
-    search_fields = ('item', 'category', 'subcategory')
-    ordering = ('-week',)
+from .models import DashboardData
+@admin.register(DashboardData)
+class DashboardDataAdmin(admin.ModelAdmin):
+    list_display = ('date', 'store_code', 'item_code', 'department', 'sales_qty', 'net_sales')
+    list_filter = ('department', 'store_code', 'season', 'date')
+    search_fields = ('item_code', 'store_code', 'department', 'group')
+    ordering = ('-date',)

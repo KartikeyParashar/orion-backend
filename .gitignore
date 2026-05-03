@@ -34,6 +34,7 @@ staticfiles/
 media/
 
 # Data files (Heavy files)
+data/
 *.csv
 *.xlsx
 *.parquet

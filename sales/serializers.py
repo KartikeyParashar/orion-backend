@@ -1,7 +1,7 @@
 from rest_framework import serializers
-from .models import Sale
+from .models import DashboardData
 
-class SaleSerializer(serializers.ModelSerializer):
+class DashboardDataSerializer(serializers.ModelSerializer):
     class Meta:
-        model = Sale
+        model = DashboardData
         fields = '__all__'
