@@ -1,7 +1,8 @@
 from rest_framework import viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
-from django.db.models import Sum
+from django.db.models import Sum, Max
+from django.db.models.functions import TruncMonth
 from django_filters.rest_framework import DjangoFilterBackend
 from .models import DashboardData
 from .serializers import DashboardDataSerializer
@@ -35,14 +36,18 @@ class SaleViewSet(viewsets.ModelViewSet):
         aggregates = queryset.aggregate(
             total_sales=Sum('net_sales'),
             total_units=Sum('sales_qty'),
-            total_gross_sales=Sum('gross_sales'),
-            total_stock=Sum('ending_on_hand_qty')
+            total_gross_sales=Sum('gross_sales')
         )
         
         total_sales = float(aggregates['total_sales'] or 0)
         total_units = int(aggregates['total_units'] or 0)
         total_gross_sales = float(aggregates['total_gross_sales'] or 0)
-        total_stock = int(aggregates['total_stock'] or 0)
+        
+        max_date = queryset.aggregate(max_date=Max('date'))['max_date']
+        total_stock = 0
+        if max_date:
+            total_stock_agg = queryset.filter(date=max_date).aggregate(total_stock=Sum('ending_on_hand_qty'))
+            total_stock = int(total_stock_agg['total_stock'] or 0)
         
         total_markdown = (1 - (total_sales / total_gross_sales)) * 100 if total_gross_sales > 0 else 0
         sell_thru = (total_units / (total_units + total_stock)) * 100 if (total_units + total_stock) > 0 else 0
@@ -51,13 +56,15 @@ class SaleViewSet(viewsets.ModelViewSet):
         net_margin = total_sales - total_cogs
         net_margin_percent = (net_margin / total_sales) * 100 if total_sales > 0 else 0
         
-        chart_data_qs = queryset.values('date').annotate(
+        chart_data_qs = queryset.annotate(
+            month=TruncMonth('date')
+        ).values('month').annotate(
             units=Sum('sales_qty'),
             sales=Sum('net_sales')
-        ).order_by('date')
+        ).order_by('month')
         
         chart_data = [{
-            'date': item['date'].strftime('%Y-%m-%d') if item['date'] else '',
+            'date': item['month'].strftime('%b %Y') if item['month'] else '',
             'units': item['units'],
             'sales': float(item['sales'] or 0)
         } for item in chart_data_qs]
