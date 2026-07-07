@@ -60,14 +60,33 @@ class SaleViewSet(viewsets.ModelViewSet):
             month=TruncMonth('date')
         ).values('month').annotate(
             units=Sum('sales_qty'),
-            sales=Sum('net_sales')
+            sales=Sum('net_sales'),
+            max_date_in_month=Max('date')
         ).order_by('month')
         
-        chart_data = [{
-            'date': item['month'].strftime('%b %Y') if item['month'] else '',
-            'units': item['units'],
-            'sales': float(item['sales'] or 0)
-        } for item in chart_data_qs]
+        chart_data = []
+        cumulative_units = 0
+        for item in chart_data_qs:
+            month = item['month']
+            units = item['units']
+            sales = float(item['sales'] or 0)
+            max_date = item['max_date_in_month']
+            
+            cumulative_units += units
+            
+            month_stock = 0
+            if max_date:
+                stock_agg = queryset.filter(date=max_date).aggregate(total_stock=Sum('ending_on_hand_qty'))
+                month_stock = int(stock_agg['total_stock'] or 0)
+                
+            sell_thru = (cumulative_units / (cumulative_units + month_stock)) * 100 if (cumulative_units + month_stock) > 0 else 0
+            
+            chart_data.append({
+                'date': month.strftime('%b %Y') if month else '',
+                'units': units,
+                'sales': sales,
+                'sell_thru': round(sell_thru, 2)
+            })
         
         # Calculate active categories for insight
         unique_categories_count = queryset.values('department').distinct().count()
