@@ -29,7 +29,8 @@ def load_data():
                 net_sales=float(row['Net Sales Price']),
                 gross_sales=float(row['Gross Selling Price']),
                 discount=float(row['Gross Selling Price']) - float(row['Net Sales Price']),
-                ending_on_hand_qty=int(row['Ending Stock'])
+                ending_on_hand_qty=int(row['Ending Stock']),
+                launch_date=None
             ))
         DashboardData.objects.bulk_create(instances)
         print(f"Successfully loaded {len(instances)} records into SQLite!")

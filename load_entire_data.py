@@ -46,6 +46,9 @@ def load_data():
     for col in categorical_cols:
         if col in merged_df.columns:
             merged_df[col] = merged_df[col].fillna('')
+            
+    if 'Launch Date' in merged_df.columns:
+        merged_df['Launch Date'] = pd.to_datetime(merged_df['Launch Date']).dt.date
     
     print(f"Preparing {len(merged_df)} records for database insertion...")
     
@@ -70,7 +73,8 @@ def load_data():
             net_sales=float(row['Net Sales']),
             gross_sales=float(row['Gross Sales']),
             discount=float(row['Discount Amount']),
-            ending_on_hand_qty=int(row['Ending On Hand Quantity'])
+            ending_on_hand_qty=int(row['Ending On Hand Quantity']),
+            launch_date=row['Launch Date'] if pd.notnull(row.get('Launch Date')) else None
         ))
     
     print("Bulk creating records in SQLite...")

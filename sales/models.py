@@ -15,6 +15,7 @@ class DashboardData(models.Model):
     gross_sales = models.DecimalField(max_digits=15, decimal_places=2, default=0.00)
     discount = models.DecimalField(max_digits=15, decimal_places=2, default=0.00)
     ending_on_hand_qty = models.IntegerField(default=0)
+    launch_date = models.DateField(null=True, blank=True)
 
     class Meta:
         db_table = 'dashboard_data'

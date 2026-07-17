@@ -1,7 +1,7 @@
 from rest_framework import viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
-from django.db.models import Sum, Max
+from django.db.models import Sum, Max, Count, Q
 from django.db.models.functions import TruncMonth
 from django_filters.rest_framework import DjangoFilterBackend
 from .models import DashboardData
@@ -105,3 +105,74 @@ class SaleViewSet(viewsets.ModelViewSet):
             'chartData': chart_data,
             'activeCategories': unique_categories_count
         })
+
+    @action(detail=False, methods=['get'])
+    def style_performance(self, request):
+        queryset = self.filter_queryset(self.get_queryset())
+        
+        max_date = queryset.aggregate(max_date=Max('date'))['max_date']
+        if not max_date:
+            return Response([])
+            
+        styles_data = queryset.exclude(style='').values('style').annotate(
+            launch_date=Max('launch_date'),
+            total_stores=Count('store_code', distinct=True),
+            total_sales_qty=Sum('sales_qty'),
+            gross_revenue=Sum('gross_sales'),
+            net_revenue=Sum('net_sales'),
+            current_stock=Sum('ending_on_hand_qty', filter=Q(date=max_date)),
+            last_sale_date=Max('date', filter=Q(sales_qty__gt=0))
+        )
+        
+        results = []
+        for item in styles_data:
+            style = item['style']
+            launch_date = item['launch_date']
+            total_stores = item['total_stores'] or 0
+            total_sales_qty = int(item['total_sales_qty'] or 0)
+            gross_revenue = float(item['gross_revenue'] or 0)
+            net_revenue = float(item['net_revenue'] or 0)
+            current_stock = int(item['current_stock'] or 0)
+            last_sale_date = item['last_sale_date']
+            
+            total_buy_qty = total_sales_qty + current_stock
+            sell_thru_pct = (total_sales_qty / total_buy_qty * 100) if total_buy_qty > 0 else 0
+            
+            markdown_dollar = gross_revenue - net_revenue
+            markdown_pct = (markdown_dollar / gross_revenue * 100) if gross_revenue > 0 else 0
+            
+            asp = (net_revenue / total_sales_qty) if total_sales_qty > 0 else 0
+            
+            weeks_since_last_sale = 0
+            if last_sale_date:
+                days_diff = (max_date - last_sale_date).days
+                weeks_since_last_sale = max(0, days_diff / 7.0)
+            
+            ros_weeks = 0
+            weeks_since_launch = 1
+            if launch_date:
+                days_since_launch = (max_date - launch_date).days
+                weeks_since_launch = max(1, days_since_launch / 7.0)
+                ros_weeks = total_sales_qty / weeks_since_launch
+                
+            sell_thru_per_week = sell_thru_pct / weeks_since_launch
+                
+            results.append({
+                'style': style,
+                'launch_date': launch_date.strftime('%Y-%m-%d') if launch_date else None,
+                'total_stores': total_stores,
+                'total_sales': total_sales_qty,
+                'total_buy_qty': total_buy_qty,
+                'sell_thru_pct': round(sell_thru_pct, 2),
+                'sell_thru_per_week': round(sell_thru_per_week, 2),
+                'weeks_since_launch': round(weeks_since_launch, 1),
+                'ros_weeks': round(ros_weeks, 2),
+                'gross_revenue': round(gross_revenue, 2),
+                'net_revenue': round(net_revenue, 2),
+                'markdown_dollar': round(markdown_dollar, 2),
+                'markdown_pct': round(markdown_pct, 2),
+                'asp': round(asp, 2),
+                'weeks_since_last_sale': round(weeks_since_last_sale, 1)
+            })
+            
+        return Response(results)
