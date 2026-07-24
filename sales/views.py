@@ -13,11 +13,17 @@ class SaleViewSet(viewsets.ModelViewSet):
     filter_backends = [DjangoFilterBackend]
     filterset_fields = ['group', 'department', 'item_class', 'item_code', 'store_code', 'date', 'season']
 
+    def get_queryset(self):
+        from django.utils import timezone
+        today = timezone.localtime().date()
+        return super().get_queryset().filter(date__lte=today)
+
     @action(detail=False, methods=['get'])
     def filters(self, request):
-        categories = self.queryset.exclude(department__isnull=True).values_list('department', flat=True).distinct()
-        stores = self.queryset.exclude(store_code__isnull=True).values_list('store_code', flat=True).distinct()
-        seasons = self.queryset.exclude(season__isnull=True).values_list('season', flat=True).distinct()
+        queryset = self.get_queryset()
+        categories = queryset.exclude(department__isnull=True).values_list('department', flat=True).distinct()
+        stores = queryset.exclude(store_code__isnull=True).values_list('store_code', flat=True).distinct()
+        seasons = queryset.exclude(season__isnull=True).values_list('season', flat=True).distinct()
         
         import re
         def natural_sort_key(s):
@@ -44,13 +50,19 @@ class SaleViewSet(viewsets.ModelViewSet):
         total_gross_sales = float(aggregates['total_gross_sales'] or 0)
         
         max_date = queryset.aggregate(max_date=Max('date'))['max_date']
-        total_stock = 0
+        
         if max_date:
-            total_stock_agg = queryset.filter(date=max_date).aggregate(total_stock=Sum('ending_on_hand_qty'))
-            total_stock = int(total_stock_agg['total_stock'] or 0)
+            total_stock_agg = queryset.filter(date=max_date).aggregate(
+                total_stock=Sum('ending_on_hand_qty')
+            )
+            total_stock = total_stock_agg['total_stock'] or 0
+        else:
+            total_stock = 0
         
         total_markdown = (1 - (total_sales / total_gross_sales)) * 100 if total_gross_sales > 0 else 0
+        
         sell_thru = (total_units / (total_units + total_stock)) * 100 if (total_units + total_stock) > 0 else 0
+        
         avg_unit_price = total_sales / total_units if total_units > 0 else 0
         total_cogs = total_sales * 0.65
         net_margin = total_sales - total_cogs
@@ -70,22 +82,25 @@ class SaleViewSet(viewsets.ModelViewSet):
             month = item['month']
             units = item['units']
             sales = float(item['sales'] or 0)
-            max_date = item['max_date_in_month']
+            max_date_in_month = item['max_date_in_month']
             
             cumulative_units += units
             
-            month_stock = 0
-            if max_date:
-                stock_agg = queryset.filter(date=max_date).aggregate(total_stock=Sum('ending_on_hand_qty'))
-                month_stock = int(stock_agg['total_stock'] or 0)
+            if max_date_in_month:
+                month_stock_agg = queryset.filter(date=max_date_in_month).aggregate(
+                    month_stock=Sum('ending_on_hand_qty')
+                )
+                month_stock = month_stock_agg['month_stock'] or 0
+            else:
+                month_stock = 0
                 
-            sell_thru = (cumulative_units / (cumulative_units + month_stock)) * 100 if (cumulative_units + month_stock) > 0 else 0
+            sell_thru_month = (cumulative_units / (cumulative_units + month_stock)) * 100 if (cumulative_units + month_stock) > 0 else 0
             
             chart_data.append({
                 'date': month.strftime('%b %Y') if month else '',
                 'units': units,
                 'sales': sales,
-                'sell_thru': round(sell_thru, 2)
+                'sell_thru': sell_thru_month
             })
         
         # Calculate active categories for insight
@@ -155,7 +170,7 @@ class SaleViewSet(viewsets.ModelViewSet):
                 weeks_since_launch = max(1, days_since_launch / 7.0)
                 ros_weeks = total_sales_qty / weeks_since_launch
                 
-            sell_thru_per_week = sell_thru_pct / weeks_since_launch
+            sell_thru_per_week = None
                 
             results.append({
                 'style': style,
@@ -163,8 +178,8 @@ class SaleViewSet(viewsets.ModelViewSet):
                 'total_stores': total_stores,
                 'total_sales': total_sales_qty,
                 'total_buy_qty': total_buy_qty,
-                'sell_thru_pct': round(sell_thru_pct, 2),
-                'sell_thru_per_week': round(sell_thru_per_week, 2),
+                'sell_thru_pct': sell_thru_pct,
+                'sell_thru_per_week': sell_thru_per_week,
                 'weeks_since_launch': round(weeks_since_launch, 1),
                 'ros_weeks': round(ros_weeks, 2),
                 'gross_revenue': round(gross_revenue, 2),

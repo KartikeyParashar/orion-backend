@@ -19,6 +19,11 @@ def load_data():
     sales_df['Date'] = pd.to_datetime(sales_df['Date'])
     soh_df['Date'] = pd.to_datetime(soh_df['Date'])
     
+    sales_df = pd.merge(sales_df, product_df[['Item Code', 'GROSS SELLING PRICE']], on='Item Code', how='left')
+    sales_df['Gross Sales'] = sales_df['Sales Qty'] * sales_df['GROSS SELLING PRICE']
+    sales_df['Discount Amount'] = sales_df['Gross Sales'] * sales_df['Markdown Percentage']
+    sales_df['Net Sales'] = sales_df['Gross Sales'] - sales_df['Discount Amount']
+    
     # Aggregate sales data to daily level per store/item to avoid duplicating SOH
     sales_daily = sales_df.groupby(['Date', 'Store Code', 'Item Code'], as_index=False).agg({
         'Sales Qty': 'sum',
